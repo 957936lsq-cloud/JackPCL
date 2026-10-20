@@ -1,14 +1,15 @@
 # JackPCL
 
-Personal downstream branch based on the official PCL source tree.
+Personal downstream of the official PCL source tree (independent repository — upstream sync runs via the Sync workflow).
 
 ## Branch
 
 - Working branch: `jack-pcl`
 - Initial base: PCL `2.99.0.0`
 - Local patch: `RestrictMcDownload = False`
+- Launch-time nag prompts removed (sponsorship + buy-Minecraft)
 
-The fork keeps the upstream source structure intact and carries only a small JackPCL-specific patch.
+The tree keeps the upstream source structure intact and carries only small JackPCL-specific patches.
 
 ## Build
 
@@ -51,4 +52,4 @@ If upstream removes or substantially changes the restriction flag, the sync work
 
 ## Notes
 
-This is a personal fork and is not an official PCL build. Keep the upstream licence and attribution requirements in mind before redistributing modified binaries.
+This is a personal downstream and is not an official PCL build. Keep the upstream licence and attribution requirements in mind before redistributing modified binaries.
