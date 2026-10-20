@@ -1,4 +1,4 @@
-name: PCL Jack Release
+name: PCL Jack Build
 
 on:
   push:
@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   release:
-    name: Build and Release PCL Jack
+    name: Build PCL Jack
     runs-on: windows-latest
 
     steps:
@@ -148,13 +148,3 @@ jobs:
             dist/LICENCE
           if-no-files-found: error
           retention-days: 90
-
-      - name: Publish GitHub Release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $tag = "pcl-jack-$env:PCL_VERSION-build-${{ github.run_number }}"
-          $title = "Plain Craft Launcher (PCL) Jack 修改版 $env:PCL_VERSION · Build ${{ github.run_number }}"
-          $notes = "第三方 PCL 修改版，非官方版本。基于 PCL $env:PCL_VERSION；恢复 Minecraft 下载；禁用启动器更新检查；默认关闭启动器公告；精简非必要提示。源码分支：jack-release。"
-          gh release create $tag "dist\PCL-Jack.exe" "dist\PCL-Jack.zip" "dist\NOTICE.txt" "dist\LICENCE" --repo "${{ github.repository }}" --target "${{ github.sha }}" --title $title --notes $notes --latest
