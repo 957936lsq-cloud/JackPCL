@@ -78,8 +78,9 @@ jobs:
           PCL_MS_CLIENT_ID: ${{ secrets.CLIENT_ID }}
           PCL_CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
         run: |
-          $path = "Plain Craft Launcher 2\Modules\ModSecret.vb"
-          $text = Get-Content $path -Raw
+          $secretPath = "Plain Craft Launcher 2\Modules\ModSecret.vb"
+          $basePath = "Plain Craft Launcher 2\Modules\Base\ModBase.vb"
+          $text = Get-Content $secretPath -Raw
 
           if (-not [string]::IsNullOrWhiteSpace($env:PCL_MS_CLIENT_ID)) {
             $text = $text.Replace(
@@ -95,12 +96,14 @@ jobs:
             )
           }
 
-          $text = $text.Replace(
+          Set-Content -Path $secretPath -Value $text -Encoding utf8
+
+          $baseText = Get-Content $basePath -Raw
+          $baseText = $baseText.Replace(
             'Public Const CommitHash As String = ""',
             'Public Const CommitHash As String = "${{ github.sha }}"'
           )
-
-          Set-Content -Path $path -Value $text -Encoding utf8
+          Set-Content -Path $basePath -Value $baseText -Encoding utf8
 
       - name: Restore NuGet packages
         shell: pwsh
@@ -135,7 +138,8 @@ jobs:
           Built by GitHub Actions
           "@ | Set-Content "dist\BUILD_INFO.txt" -Encoding utf8
 
-          $zipName = "JackPCL-$env:JACK_VERSION-${{ github.sha }}".Substring(0, [Math]::Min(("JackPCL-$env:JACK_VERSION-${{ github.sha }}").Length, 32)) + ".zip"
+          $shortSha = "${{ github.sha }}".Substring(0, 7)
+          $zipName = "JackPCL-$env:JACK_VERSION-$shortSha.zip"
           Compress-Archive -Path "dist\JackPCL.exe", "dist\BUILD_INFO.txt" -DestinationPath "dist\$zipName" -CompressionLevel Optimal
           "JACK_ZIP=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
