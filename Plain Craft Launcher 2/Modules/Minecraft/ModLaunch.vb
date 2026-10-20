@@ -1053,10 +1053,7 @@ Retry:
         Try
             Dim ResultJson As JObject = Result.DeserializeJson()
             If Not (ResultJson.ContainsKey("items") AndAlso ResultJson("items").Any) Then
-                Select Case MyMsgBox("你尚未购买正版 Minecraft，或者 Xbox Game Pass 已到期。", "登录失败", "购买 Minecraft", "取消")
-                    Case 1
-                        OpenWebsite("https://www.xbox.com/zh-cn/games/store/minecraft-java-bedrock-edition-for-pc/9nxp44l49shj")
-                End Select
+                MyMsgBox("该微软账号当前没有可用的 Minecraft Java 版授权，或者 Xbox Game Pass 已到期。", "登录失败", "确定")
                 Throw New OperationCanceledException
             End If
         Catch ex As Exception
