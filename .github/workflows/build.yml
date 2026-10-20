@@ -1,69 +1,151 @@
-name: Build
+name: JackPCL Build
+
 on:
   push:
+    branches:
+      - jack-pcl
     paths:
       - 'Plain Craft Launcher 2/**'
-      - '.github/workflows/**'
-  pull_request:
-    paths:
-      - 'Plain Craft Launcher 2/**'
-      - '.github/workflows/**'
+      - 'PCLCS/**'
+      - 'MeloongCore'
+      - '.github/workflows/build.yml'
+      - 'JACKPCL.md'
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jackpcl-build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    name: Build
+    name: Build JackPCL Release
     runs-on: windows-latest
-    strategy:  
-       matrix:  
-         configuration: [Debug, Release]
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
 
-    - name: Checkout
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 1
-        submodules: true
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v3
+        with:
+          msbuild-architecture: x64
 
-    - name: Set Describe
-      shell: bash
-      run: |
-          describe=`git describe --tags --always`
-          echo "describe=$describe" >> $GITHUB_ENV
+      - name: Read version and verify JackPCL patch
+        shell: pwsh
+        run: |
+          $baseFile = "Plain Craft Launcher 2\Modules\Base\ModBase.vb"
+          $secretFile = "Plain Craft Launcher 2\Modules\ModSecret.vb"
 
-    - name: Setup MSBuild.exe
-      uses: microsoft/setup-msbuild@v3
-      with:
-        msbuild-architecture: x64
-    
-    - name: Update Help
-      run:  |
-        Set-Location ..
-        git clone https://github.com/LTCatt/PCL2Help.git -b master --single-branch --depth 1
-        Set-Location PCL2Help
-        Remove-Item -Path *.* -Recurse -Force
-        Compress-Archive -Path .\* -DestinationPath .\Help.zip
-        Copy-Item -Path .\Help.zip -Destination "${{ GITHUB.WORKSPACE }}\Plain Craft Launcher 2\Resources\Help.zip" -Force
-        Set-Location ..
-        Remove-Item PCL2Help -Recurse -Force
-        Set-Location ${{ GITHUB.WORKSPACE }}
+          $versionLine = Select-String -Path $baseFile -Pattern 'VersionBaseName As String = "([^"]+)"'
+          if (-not $versionLine) {
+            throw "Unable to determine PCL version."
+          }
+          $version = $versionLine.Matches[0].Groups[1].Value
+          "JACK_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+          $restrictLine = Select-String -Path $secretFile -Pattern 'Public Const RestrictMcDownload As Boolean = False'
+          if (-not $restrictLine) {
+            throw "JackPCL patch is missing: RestrictMcDownload must be False."
+          }
 
-    - name: Replace
-      run: |
-        (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "")', 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "${{ secrets.CLIENT_ID }}")' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
-        (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "")', 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "${{ secrets.CURSEFORGE_API_KEY }}")' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
-        (gc "Plain Craft Launcher 2\Modules\Base\ModBase.vb") -replace 'Public Const CommitHash As String = ""', 'Public Const CommitHash As String = "${{ github.sha }}"' | Out-File "Plain Craft Launcher 2\Modules\Base\ModBase.vb"
-        
-    - name: Restore NuGet Packages
-      run: dotnet restore PCLCS\PCLCS.csproj
+      - name: Update built-in help
+        shell: pwsh
+        run: |
+          $helpDir = Join-Path $env:RUNNER_TEMP "PCL2Help"
+          $helpZip = Join-Path $env:RUNNER_TEMP "Help.zip"
 
-    - name: Build
-      run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=${{ matrix.configuration }}
+          if (Test-Path $helpDir) {
+            Remove-Item $helpDir -Recurse -Force
+          }
+          if (Test-Path $helpZip) {
+            Remove-Item $helpZip -Force
+          }
 
-    - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v7
-      with:
-        name: ${{ matrix.configuration }} ${{ env.describe }}
-        path: Plain Craft Launcher 2\obj\${{ matrix.configuration }}\Plain Craft Launcher 2.exe
+          git clone https://github.com/LTCatt/PCL2Help.git $helpDir -b master --single-branch --depth 1
+          Remove-Item (Join-Path $helpDir ".git") -Recurse -Force
+          Compress-Archive -Path (Join-Path $helpDir "*") -DestinationPath $helpZip -CompressionLevel Optimal
+          Copy-Item $helpZip "Plain Craft Launcher 2\Resources\Help.zip" -Force
+
+      - name: Inject optional API credentials
+        shell: pwsh
+        env:
+          PCL_MS_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          PCL_CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+        run: |
+          $path = "Plain Craft Launcher 2\Modules\ModSecret.vb"
+          $text = Get-Content $path -Raw
+
+          if (-not [string]::IsNullOrWhiteSpace($env:PCL_MS_CLIENT_ID)) {
+            $text = $text.Replace(
+              'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "")',
+              ('Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "' + $env:PCL_MS_CLIENT_ID + '")')
+            )
+          }
+
+          if (-not [string]::IsNullOrWhiteSpace($env:PCL_CURSEFORGE_API_KEY)) {
+            $text = $text.Replace(
+              'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "")',
+              ('Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "' + $env:PCL_CURSEFORGE_API_KEY + '")')
+            )
+          }
+
+          $text = $text.Replace(
+            'Public Const CommitHash As String = ""',
+            'Public Const CommitHash As String = "${{ github.sha }}"'
+          )
+
+          Set-Content -Path $path -Value $text -Encoding utf8
+
+      - name: Restore NuGet packages
+        shell: pwsh
+        run: dotnet restore "PCLCS\PCLCS.csproj"
+
+      - name: Build Release
+        shell: pwsh
+        run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=Release -m
+
+      - name: Package JackPCL
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "Plain Craft Launcher 2\obj\Release\Plain Craft Launcher 2.exe",
+            "Plain Craft Launcher 2\bin\Plain Craft Launcher 2.exe",
+            "Plain Craft Launcher 2\bin\Release\Plain Craft Launcher 2.exe"
+          )
+          $sourceExe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $sourceExe) {
+            throw "Build succeeded but Plain Craft Launcher 2.exe was not found."
+          }
+
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item $sourceExe "dist\JackPCL.exe" -Force
+
+          @"
+          JackPCL
+          Base version: $env:JACK_VERSION
+          Commit: ${{ github.sha }}
+          Branch: ${{ github.ref_name }}
+          Minecraft download restriction: disabled
+          Built by GitHub Actions
+          "@ | Set-Content "dist\BUILD_INFO.txt" -Encoding utf8
+
+          $zipName = "JackPCL-$env:JACK_VERSION-${{ github.sha }}".Substring(0, [Math]::Min(("JackPCL-$env:JACK_VERSION-${{ github.sha }}").Length, 32)) + ".zip"
+          Compress-Archive -Path "dist\JackPCL.exe", "dist\BUILD_INFO.txt" -DestinationPath "dist\$zipName" -CompressionLevel Optimal
+          "JACK_ZIP=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Upload JackPCL artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: JackPCL-${{ env.JACK_VERSION }}-${{ github.run_number }}
+          path: |
+            dist/JackPCL.exe
+            dist/BUILD_INFO.txt
+            dist/${{ env.JACK_ZIP }}
+          if-no-files-found: error
+          retention-days: 90
