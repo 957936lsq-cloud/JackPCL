@@ -62,7 +62,7 @@
                         <ColumnDefinition Width="150" />
                     </Grid.ColumnDefinitions>
                     <local:MyListItem Title="bangbang93" Margin="-5,0,15,0" IsHitTestVisible="False" Info="提供 BMCLAPI 镜像源和 Forge 安装工具，详见 https://bmclapi.bangbang93.com" Grid.Row="0" Grid.Column="1" />
-                    <local:MyButton Text="赞助镜像源" Grid.Row="0" Grid.Column="2" Height="35" local:CustomEventService.EventType="打开网页" local:CustomEventService.EventData="https://meloong.com/afd/a/bangbang93" />
+                    <local:MyButton Text="镜像源主页" Grid.Row="0" Grid.Column="2" Height="35" local:CustomEventService.EventType="打开网页" local:CustomEventService.EventData="https://bmclapi.bangbang93.com" />
                     <local:MyListItem Title="MC 百科" Margin="-5,0,0,0" IsHitTestVisible="False" Grid.ColumnSpan="2" Info="提供了 Mod 名称的中文翻译和更多相关信息！" Grid.Row="1" Grid.Column="1" />
                     <local:MyButton Text="打开百科" Grid.Row="1" Grid.Column="2" Height="35" local:CustomEventService.EventType="打开网页" local:CustomEventService.EventData="https://www.mcmod.cn" />
                     <local:MyListItem Title="z0z0r4" Margin="-5,0,0,0" IsHitTestVisible="False" Grid.ColumnSpan="2" Info="提供了 MCIM 社区资源镜像源和帮助库图床！" Grid.Row="2" Grid.Column="1" />
@@ -128,7 +128,7 @@
                     </Image>
                 </Grid>
             </local:MyCard>
-            <local:MyCard Margin="0,0,0,15" Title="赞助者">
+            <local:MyCard Margin="0,0,0,15" Title="赞助者" Visibility="Collapsed">
                 <StackPanel Margin="25,40,19,20">
                     <TextBlock HorizontalAlignment="Left" Text="以下是近期的高级赞助者们！感谢大家对 PCL 的支持！！！" Margin="0,0,25,5.5" TextTrimming="None" TextWrapping="WrapWithOverflow" />
                     <WrapPanel Margin="0,0,0,10">                        <TextBlock Margin="0,1.5,6,0" Text="J" />
