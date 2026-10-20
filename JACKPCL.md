@@ -1,0 +1,54 @@
+# JackPCL
+
+Personal downstream branch based on the official PCL source tree.
+
+## Branch
+
+- Working branch: `jack-pcl`
+- Initial base: PCL `2.99.0.0`
+- Local patch: `RestrictMcDownload = False`
+
+The fork keeps the upstream source structure intact and carries only a small JackPCL-specific patch.
+
+## Build
+
+GitHub Actions workflow: **JackPCL Build**
+
+It runs automatically when relevant files are pushed to `jack-pcl`, and can also be started manually from the Actions page.
+
+A successful run uploads an artifact containing:
+
+- `JackPCL.exe`
+- `BUILD_INFO.txt`
+- `JackPCL-<version>-<commit>.zip`
+
+Artifacts are retained for 90 days.
+
+## Optional API credentials
+
+The public source tree does not include upstream private API credentials. If these features are needed in a source build, add repository Actions secrets with these names:
+
+- `CLIENT_ID` — Microsoft OAuth client ID
+- `CURSEFORGE_API_KEY` — CurseForge API key
+
+The build workflow works without them, but features that depend on those credentials may be unavailable.
+
+## Sync with official PCL
+
+GitHub Actions workflow: **Sync JackPCL Upstream**
+
+Run it manually when you want to merge the latest official `Meloong-Git/PCL` `main` branch into `jack-pcl`.
+
+The workflow:
+
+1. fetches official upstream,
+2. merges it into `jack-pcl`,
+3. verifies/re-applies `RestrictMcDownload = False`,
+4. pushes the result,
+5. which then triggers a fresh JackPCL build.
+
+If upstream removes or substantially changes the restriction flag, the sync workflow intentionally fails instead of making an unsafe automatic edit.
+
+## Notes
+
+This is a personal fork and is not an official PCL build. Keep the upstream licence and attribution requirements in mind before redistributing modified binaries.
