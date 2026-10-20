@@ -1,0 +1,16 @@
+Plain Craft Launcher (PCL) Jack 修改版
+
+第三方基于 Plain Craft Launcher (PCL) 独立进行二次创作，非 PCL 官方版本。
+原项目：Meloong-Git/PCL
+原作者：龙腾猫跃（LTCat）
+修改版源码：https://github.com/957936lsq-cloud/PCL/tree/jack-release
+
+主要改动：
+- 恢复 Minecraft 下载功能
+- 禁用启动器自动更新与更新检查
+- 默认关闭启动器公告
+- 精简非必要启动、购买和赞助提示
+- 保留功能性错误提示与许可证要求的最低限度提示
+
+Base version: 2.99.0.0
+Commit: 9e38ba03c5525b4cebe0d60e8acbc7347db81c11
