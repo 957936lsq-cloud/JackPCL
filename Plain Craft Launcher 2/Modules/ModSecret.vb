@@ -146,7 +146,8 @@ Friend Module ModSecret
 #Region "更新"
 
     Friend Sub UpdateCheckByButton()
-        Hint("该版本中不包含更新功能……")
+        'PCL Jack Release: launcher update checks are intentionally disabled.
+        Return
     End Sub
 
     Friend IsUpdateWaitingRestart As Boolean = False
