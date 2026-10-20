@@ -1,27 +1,26 @@
-name: JackPCL Build
+name: PCL Jack Release
 
 on:
   push:
     branches:
-      - jack-pcl
+      - jack-release
     paths:
       - 'Plain Craft Launcher 2/**'
       - 'PCLCS/**'
       - 'MeloongCore'
       - '.github/workflows/build.yml'
-      - 'JACKPCL.md'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: jackpcl-build-${{ github.ref }}
+  group: pcl-jack-release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build JackPCL Release
+  release:
+    name: Build and Release PCL Jack
     runs-on: windows-latest
 
     steps:
@@ -36,22 +35,17 @@ jobs:
         with:
           msbuild-architecture: x64
 
-      - name: Read version and verify JackPCL patch
+      - name: Read version and verify patches
         shell: pwsh
         run: |
           $baseFile = "Plain Craft Launcher 2\Modules\Base\ModBase.vb"
           $secretFile = "Plain Craft Launcher 2\Modules\ModSecret.vb"
-
           $versionLine = Select-String -Path $baseFile -Pattern 'VersionBaseName As String = "([^"]+)"'
-          if (-not $versionLine) {
-            throw "Unable to determine PCL version."
-          }
+          if (-not $versionLine) { throw "Unable to determine PCL version." }
           $version = $versionLine.Matches[0].Groups[1].Value
-          "JACK_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-
-          $restrictLine = Select-String -Path $secretFile -Pattern 'Public Const RestrictMcDownload As Boolean = False'
-          if (-not $restrictLine) {
-            throw "JackPCL patch is missing: RestrictMcDownload must be False."
+          "PCL_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          if (-not (Select-String -Path $secretFile -Pattern 'Public Const RestrictMcDownload As Boolean = False')) {
+            throw "Minecraft download patch is missing."
           }
 
       - name: Update built-in help
@@ -59,14 +53,8 @@ jobs:
         run: |
           $helpDir = Join-Path $env:RUNNER_TEMP "PCL2Help"
           $helpZip = Join-Path $env:RUNNER_TEMP "Help.zip"
-
-          if (Test-Path $helpDir) {
-            Remove-Item $helpDir -Recurse -Force
-          }
-          if (Test-Path $helpZip) {
-            Remove-Item $helpZip -Force
-          }
-
+          if (Test-Path $helpDir) { Remove-Item $helpDir -Recurse -Force }
+          if (Test-Path $helpZip) { Remove-Item $helpZip -Force }
           git clone https://github.com/LTCatt/PCL2Help.git $helpDir -b master --single-branch --depth 1
           Remove-Item (Join-Path $helpDir ".git") -Recurse -Force
           Compress-Archive -Path (Join-Path $helpDir "*") -DestinationPath $helpZip -CompressionLevel Optimal
@@ -80,23 +68,23 @@ jobs:
         run: |
           $secretPath = "Plain Craft Launcher 2\Modules\ModSecret.vb"
           $basePath = "Plain Craft Launcher 2\Modules\Base\ModBase.vb"
-          $text = Get-Content $secretPath -Raw
+          $secretText = Get-Content $secretPath -Raw
 
           if (-not [string]::IsNullOrWhiteSpace($env:PCL_MS_CLIENT_ID)) {
-            $text = $text.Replace(
+            $secretText = $secretText.Replace(
               'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "")',
               ('Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "' + $env:PCL_MS_CLIENT_ID + '")')
             )
           }
 
           if (-not [string]::IsNullOrWhiteSpace($env:PCL_CURSEFORGE_API_KEY)) {
-            $text = $text.Replace(
+            $secretText = $secretText.Replace(
               'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "")',
               ('Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "' + $env:PCL_CURSEFORGE_API_KEY + '")')
             )
           }
 
-          Set-Content -Path $secretPath -Value $text -Encoding utf8
+          Set-Content -Path $secretPath -Value $secretText -Encoding utf8
 
           $baseText = Get-Content $basePath -Raw
           $baseText = $baseText.Replace(
@@ -113,7 +101,7 @@ jobs:
         shell: pwsh
         run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=Release -m
 
-      - name: Package JackPCL
+      - name: Package
         shell: pwsh
         run: |
           $candidates = @(
@@ -122,34 +110,51 @@ jobs:
             "Plain Craft Launcher 2\bin\Release\Plain Craft Launcher 2.exe"
           )
           $sourceExe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $sourceExe) {
-            throw "Build succeeded but Plain Craft Launcher 2.exe was not found."
-          }
+          if (-not $sourceExe) { throw "Build succeeded but launcher exe was not found." }
 
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Copy-Item $sourceExe "dist\JackPCL.exe" -Force
+          Copy-Item $sourceExe "dist\PCL-Jack.exe" -Force
+          Copy-Item "LICENCE" "dist\LICENCE" -Force
 
           @"
-          JackPCL
-          Base version: $env:JACK_VERSION
+          Plain Craft Launcher (PCL) Jack 修改版
+
+          第三方基于 Plain Craft Launcher (PCL) 独立进行二次创作，非 PCL 官方版本。
+          原项目：Meloong-Git/PCL
+          原作者：龙腾猫跃（LTCat）
+          修改版源码：https://github.com/${{ github.repository }}/tree/jack-release
+
+          主要改动：
+          - 恢复 Minecraft 下载功能
+          - 禁用启动器自动更新与更新检查
+          - 默认关闭启动器公告
+          - 精简非必要启动、购买和赞助提示
+          - 保留功能性错误提示与许可证要求的最低限度提示
+
+          Base version: $env:PCL_VERSION
           Commit: ${{ github.sha }}
-          Branch: ${{ github.ref_name }}
-          Minecraft download restriction: disabled
-          Built by GitHub Actions
-          "@ | Set-Content "dist\BUILD_INFO.txt" -Encoding utf8
+          "@ | Set-Content "dist\NOTICE.txt" -Encoding utf8
 
-          $shortSha = "${{ github.sha }}".Substring(0, 7)
-          $zipName = "JackPCL-$env:JACK_VERSION-$shortSha.zip"
-          Compress-Archive -Path "dist\JackPCL.exe", "dist\BUILD_INFO.txt" -DestinationPath "dist\$zipName" -CompressionLevel Optimal
-          "JACK_ZIP=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Compress-Archive -Path "dist\PCL-Jack.exe", "dist\NOTICE.txt", "dist\LICENCE" -DestinationPath "dist\PCL-Jack.zip" -CompressionLevel Optimal
 
-      - name: Upload JackPCL artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: JackPCL-${{ env.JACK_VERSION }}-${{ github.run_number }}
+          name: PCL-Jack-${{ env.PCL_VERSION }}-${{ github.run_number }}
           path: |
-            dist/JackPCL.exe
-            dist/BUILD_INFO.txt
-            dist/${{ env.JACK_ZIP }}
+            dist/PCL-Jack.exe
+            dist/PCL-Jack.zip
+            dist/NOTICE.txt
+            dist/LICENCE
           if-no-files-found: error
           retention-days: 90
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "pcl-jack-$env:PCL_VERSION-build-${{ github.run_number }}"
+          $title = "Plain Craft Launcher (PCL) Jack 修改版 $env:PCL_VERSION · Build ${{ github.run_number }}"
+          $notes = "第三方 PCL 修改版，非官方版本。基于 PCL $env:PCL_VERSION；恢复 Minecraft 下载；禁用启动器更新检查；默认关闭启动器公告；精简非必要提示。源码分支：jack-release。"
+          gh release create $tag "dist\PCL-Jack.exe" "dist\PCL-Jack.zip" "dist\NOTICE.txt" "dist\LICENCE" --repo "${{ github.repository }}" --target "${{ github.sha }}" --title $title --notes $notes --latest
