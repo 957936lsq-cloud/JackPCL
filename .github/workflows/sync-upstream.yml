@@ -1,0 +1,57 @@
+name: Sync JackPCL Upstream
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: jackpcl-upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge upstream and preserve JackPCL patch
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout jack-pcl
+        uses: actions/checkout@v6
+        with:
+          ref: jack-pcl
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "JackPCL Bot"
+          git config user.email "actions@users.noreply.github.com"
+
+      - name: Fetch and merge official PCL
+        run: |
+          git remote add upstream https://github.com/Meloong-Git/PCL.git || true
+          git fetch upstream main --tags
+          git merge upstream/main --no-edit
+
+      - name: Re-apply JackPCL download patch
+        shell: bash
+        run: |
+          file='Plain Craft Launcher 2/Modules/ModSecret.vb'
+          if grep -Fq 'Public Const RestrictMcDownload As Boolean = True' "$file"; then
+            sed -i 's/Public Const RestrictMcDownload As Boolean = True/Public Const RestrictMcDownload As Boolean = False/' "$file"
+          elif grep -Fq 'Public Const RestrictMcDownload As Boolean = False' "$file"; then
+            echo "JackPCL patch already present."
+          else
+            echo "::error::RestrictMcDownload flag was changed or removed upstream. Manual review is required."
+            exit 1
+          fi
+
+      - name: Commit JackPCL patch if needed
+        run: |
+          git add 'Plain Craft Launcher 2/Modules/ModSecret.vb'
+          if ! git diff --cached --quiet; then
+            git commit -m "JackPCL: preserve Minecraft downloads after upstream sync"
+          fi
+
+      - name: Push jack-pcl
+        run: git push origin HEAD:jack-pcl
